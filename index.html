@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>かなだけMAP 2025年11月（コンパクト）</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin defer></script>
+
+  <!-- 出店データ -->
+  <script src="spots.js?v=3" defer></script>
+
+  <style>
+    html, body { height:100%; margin:0; background:#faf9f3; }
+    #map { position:fixed; inset:0; }
+
+    /* ===== コンパクトな出店リスト ===== */
+    .spot-card{
+      position:fixed; right:10px; bottom:10px;
+      width:min(52vw,210px);              /* さらに細く */
+      max-height:24vh;                    /* さらに低く */
+      overflow:auto; -webkit-overflow-scrolling:touch;
+      padding:6px 8px;                    /* 余白も圧縮 */
+      background:rgba(255,255,255,0.82);  /* 透明度UPで地図優先 */
+      backdrop-filter:blur(3px);
+      border-radius:10px;
+      box-shadow:0 4px 14px rgba(0,0,0,.14);
+      color:#333;
+      font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,-apple-system,sans-serif;
+    }
+    .spot-title{ font-size:11px; font-weight:700; margin:0 0 4px; }
+    .spot-list{ list-style:decimal; padding-left:18px; margin:0; font-size:9.5px; line-height:1.22; }
+    .spot-list li{ margin:3px 0; }
+    .spot-list .name{ margin-right:.3em; }
+    .badge{
+      display:inline-block; font-size:8.5px; padding:1px 6px;
+      border-radius:999px; background:#fde7a8; color:#5a4b1a; white-space:nowrap;
+    }
+    .err{ background:#ffe9e9; color:#8a1f1f; border:1px solid #f1b8b8; border-radius:8px; padding:6px; font-size:10px; }
+  </style>
+</head>
+<body>
+  <div id="map" role="region" aria-label="地図"></div>
+
+  <section class="spot-card" id="listCard" aria-live="polite">
+    <p class="spot-title">出店リスト（タップで地図）</p>
+    <ol class="spot-list" id="spotList"></ol>
+    <div id="msg"></div>
+  </section>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const showMsg = html => $('#msg').innerHTML = html;
+
+    function initMap(){
+      if(!window.L){ setTimeout(initMap,50); return; }
+
+      const map = L.map('map',{ zoomControl:true }).setView([35.68,139.76],10);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
+      }).addTo(map);
+
+      const icon = L.icon({
+        iconUrl:'icon.png',
+        iconSize:[44,44],
+        iconAnchor:[22,32],
+        popupAnchor:[0,-28]
+      });
+
+      const list = $('#spotList');
+      const spots = Array.isArray(window.spots) ? window.spots : [];
+      const markers = [];
+
+      if(!spots.length){
+        showMsg('<p class="err">データが読み込めませんでした。<br>repo直下に <code>spots.js</code> があり、<code>window.spots = [...]</code> を定義しているか確認してください。</p>');
+      }
+
+      spots.forEach((s,i)=>{
+        if(typeof s.lat==='number' && typeof s.lng==='number'){
+          const m = L.marker([s.lat,s.lng],{icon})
+            .addTo(map)
+            .bindPopup(`<strong>${s.name}</strong><br>${s.date}${s.time? ' ・ '+s.time:''}<br>
+              <a href="https://www.google.com/maps?q=${s.lat},${s.lng}" target="_blank" rel="noopener">Googleマップで開く</a>`);
+          markers[i] = m;
+        }
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="name">${s.name}</span><span class="badge">${s.date}</span>`;
+        li.addEventListener('click',()=>{
+          if(markers[i]){
+            map.setView(markers[i].getLatLng(),12,{animate:true});
+            markers[i].openPopup();
+          }
+        });
+        list.appendChild(li);
+      });
+
+      const existing = markers.filter(Boolean);
+      if(existing.length){
+        map.fitBounds(L.featureGroup(existing).getBounds().pad(0.2));
+      }else{
+        map.setView([35.7,139.8],9);
+      }
+    }
+    document.addEventListener('DOMContentLoaded', initMap);
+  </script>
+</body>
+</html>
